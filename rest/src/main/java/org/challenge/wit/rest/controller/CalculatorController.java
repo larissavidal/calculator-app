@@ -7,6 +7,7 @@ import java.util.concurrent.TimeUnit;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.challenge.wit.rest.message.*;
+import org.challenge.wit.rest.model.OperationMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.web.bind.annotation.*;
@@ -26,36 +27,36 @@ public class CalculatorController {
     public String sum(@RequestParam double a, @RequestParam double b, HttpServletResponse response) {
         String correlationId = UUID.randomUUID().toString();
         response.setHeader("X-Correlation-ID", correlationId);
-        String message = correlationId + "|sum:" + a + ":" + b;
-        return sendMessage(correlationId, message);
+        OperationMessage message = new OperationMessage(correlationId, "sum", a, b);
+        return sendMessage(message);
     }
 
     @GetMapping("/sub")
     public String sub(@RequestParam double a, @RequestParam double b, HttpServletResponse response) {
         String correlationId = UUID.randomUUID().toString();
         response.setHeader("X-Correlation-ID", correlationId);
-        String message = correlationId + "|sub:" + a + ":" + b;
-        return sendMessage(correlationId, message);
+        OperationMessage message = new OperationMessage(correlationId, "sub", a, b);
+        return sendMessage(message);
     }
 
     @GetMapping("multi")
     public String multi(@RequestParam double a, @RequestParam double b, HttpServletResponse response) {
         String correlationId = UUID.randomUUID().toString();
         response.setHeader("X-Correlation-ID", correlationId);
-        String message = correlationId + "|multi:" + a + ":" + b;
-        return sendMessage(correlationId, message);
+        OperationMessage message = new OperationMessage(correlationId, "multi", a, b);
+        return sendMessage(message);
     }
 
     @GetMapping("/div")
     public String div(@RequestParam double a, @RequestParam double b, HttpServletResponse response) {
         String correlationId = UUID.randomUUID().toString();
         response.setHeader("X-Correlation-ID", correlationId);
-        String message = correlationId + "|div:" + a + ":" + b;
-        return sendMessage(correlationId, message);
+        OperationMessage message = new OperationMessage(correlationId, "div", a, b);
+        return sendMessage(message);
     }
 
-    private String sendMessage(String correlationId, String message){
-        CompletableFuture<String> future = kafkaConsumer.prepareResponse(correlationId);
+    private String sendMessage(OperationMessage message){
+        CompletableFuture<String> future = kafkaConsumer.prepareResponse(message.getCorrelationId());
         kafkaProducer.send(message);
 
         try {

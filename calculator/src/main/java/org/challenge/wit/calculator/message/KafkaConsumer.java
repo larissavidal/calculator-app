@@ -1,6 +1,7 @@
 package org.challenge.wit.calculator.message;
 
 import lombok.extern.slf4j.Slf4j;
+import org.challenge.wit.calculator.model.OperationMessage;
 import org.challenge.wit.calculator.service.CalculatorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -20,19 +21,17 @@ public class KafkaConsumer {
         this.calculatorService = calculatorService;
     }
 
-    @KafkaListener(topics = "calculator-topic", groupId = "calculator-group")
-    public void consume(String message) {
+    @KafkaListener(
+        topics = "calculator-topic",
+        groupId = "calculator-group",
+        containerFactory = "kafkaListenerContainerFactory")
+    public void consume(OperationMessage message) {
         log.info("Received message on calculator consumer: {}", message);
-        String[] parts = message.split("\\|", 2);
-        if (parts.length < 2) return;
 
-        String correlationId = parts[0];
-        String operationMessage = parts[1];
-        String[] opParts = operationMessage.split(":");
-
-        String operation = opParts[0];
-        double a = Double.parseDouble(opParts[1]);
-        double b = Double.parseDouble(opParts[2]);
+        String correlationId = message.getCorrelationId();
+        String operation = message.getOperation();
+        double a = message.getA();
+        double b = message.getB();
 
         double result = switch (operation) {
             case "sum" -> calculatorService.sum(a, b);
