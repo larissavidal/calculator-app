@@ -4,26 +4,33 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
-import java.util.concurrent.CountDownLatch;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
 public class KafkaConsumer {
-    private String result;
-    private final CountDownLatch latch = new CountDownLatch(1);
+    private final Map<String, CompletableFuture<String>> futures = new ConcurrentHashMap<>();
+
+    public CompletableFuture<String> prepareResponse(String correlationId) {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        futures.put(correlationId, future);
+        return future;
+    }
 
     @KafkaListener(topics = "calculator-response-topic", groupId = "calculator-group")
     public void consume(String message) {
-        result = message;
-        latch.countDown();
-    }
+        log.info("Consumed message on rest module: {}", message);
+        String[] parts = message.split("\\|", 2);
+        if (parts.length < 2) return;
 
-    public String getResult() {
-        try {
-            latch.await();
-        } catch (InterruptedException e) {
-            log.error(e.getMessage());
-        }
-        return result;
+        String correlationId = parts[0];
+        String result = parts[1];
+
+        CompletableFuture<String> future = futures.remove(correlationId);
+        if (future != null) {
+            future.complete(result);
+        };
     }
 }

@@ -24,10 +24,17 @@ public class KafkaConsumer {
     @KafkaListener(topics = "calculator-topic", groupId = "calculator-group")
     public void consume(String message) {
         log.info("Received message: {}", message);
-        String[] parts = message.split(":");
-        String operation = parts[0];
-        double a = Double.parseDouble(parts[1]);
-        double b = Double.parseDouble(parts[2]);
+        String[] parts = message.split("\\|", 2);
+        if (parts.length < 2) return;
+
+        String correlationId = parts[0];
+        String operationMessage = parts[1];
+        String[] operationParts = operationMessage.split(":");
+
+        String operation = operationParts[0];
+        double a = Double.parseDouble(operationParts[1]);
+        double b = Double.parseDouble(operationParts[2]);
+
         double result = 0;
         switch (operation.toLowerCase()) {
             case "sum":
@@ -46,7 +53,7 @@ public class KafkaConsumer {
                 log.error("Invalid operation: {}", operation);
                 return;
         };
-        String response = "Result of operation: " + operation + ": " + result;
+        String response = correlationId + "|" + result;
         kafkaProducer.send(response);
         log.info("Sent message: {}", response);
     }
