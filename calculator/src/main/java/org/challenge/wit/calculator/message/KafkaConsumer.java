@@ -15,7 +15,7 @@ public class KafkaConsumer {
     @Autowired
     private final CalculatorService calculatorService;
     @Autowired
-    private KafkaProducer kafkaProducer;
+    protected KafkaProducer kafkaProducer;
 
     public KafkaConsumer(CalculatorService calculatorService) {
         this.calculatorService = calculatorService;
@@ -33,7 +33,7 @@ public class KafkaConsumer {
         double a = message.getA();
         double b = message.getB();
 
-        double result = switch (operation) {
+        double result = switch (operation.toLowerCase()) {
             case "sum" -> calculatorService.sum(a, b);
             case "sub" -> calculatorService.sub(a, b);
             case "multi" -> calculatorService.multi(a, b);
