@@ -1,6 +1,10 @@
 package org.challenge.wit.rest.controller;
 
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import org.challenge.wit.rest.message.KafkaConsumer;
 import org.challenge.wit.rest.message.KafkaProducer;
 import org.challenge.wit.rest.model.OperationMessage;
@@ -10,28 +14,35 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.MDC;
 
 import java.util.concurrent.CompletableFuture;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 public class CalculatorControllerTest {
-    private KafkaProducer kafkaProducer;
-    private KafkaConsumer kafkaConsumer;
+    @InjectMocks
     private CalculatorController controller;
+
+    @Mock
+    private KafkaConsumer kafkaConsumer;
+
+    @Mock
+    private KafkaProducer kafkaProducer;
+
+    @Mock
     private HttpServletResponse response;
 
     @BeforeEach
     public void setup() {
-        kafkaProducer = mock(KafkaProducer.class);
-        kafkaConsumer = mock(KafkaConsumer.class);
-        response = mock(HttpServletResponse.class);
-
-        controller = new CalculatorController();
-
-        inject(controller, "kafkaProducer", kafkaProducer);
-        inject(controller, "kafkaConsumer", kafkaConsumer);
+        MockitoAnnotations.openMocks(this);
     }
 
     @AfterEach
@@ -47,10 +58,13 @@ public class CalculatorControllerTest {
             "div, 10.0, 5.0, 2.0"
     })
     public void testOperations(String operation, double a, double b, String expectedResult) throws Exception {
+
         CompletableFuture<String> future = CompletableFuture.completedFuture(expectedResult);
         when(kafkaConsumer.prepareResponse(anyString())).thenReturn(future);
 
-        String result = switch (operation) {
+        MDC.put("correlationId", UUID.randomUUID().toString());
+
+        ResponseEntity<?> result = switch (operation) {
             case "sum" -> controller.sum(a, b, response);
             case "sub" -> controller.sub(a, b, response);
             case "multi" -> controller.multi(a, b, response);
@@ -58,7 +72,10 @@ public class CalculatorControllerTest {
             default -> throw new IllegalArgumentException("Invalid operation");
         };
 
-        assertEquals(expectedResult, result);
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertTrue(result.getBody() instanceof Map);
+        Map<?, ?> body = (Map<?, ?>) result.getBody();
+        assertEquals(expectedResult, body.get("result"));
 
         ArgumentCaptor<OperationMessage> captor = ArgumentCaptor.forClass(OperationMessage.class);
         verify(kafkaProducer, times(1)).send(captor.capture());
@@ -76,25 +93,19 @@ public class CalculatorControllerTest {
         double a = 10.0;
         double b = 0.0;
 
+        MDC.put("correlationId", UUID.randomUUID().toString());
+
         CompletableFuture<String> future = mock(CompletableFuture.class);
         when(kafkaConsumer.prepareResponse(anyString())).thenReturn(future);
         when(future.get(anyLong(), any())).thenThrow(new ArithmeticException("Division by zero"));
 
-        String result = controller.div(a, b, response);
+        ResponseEntity<?> result = controller.div(a, b, response);
 
-        assertEquals("Division by zero", result);
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
+        Map<?, ?> body = (Map<?, ?>) result.getBody();
+        assertEquals("Internal error: Division by zero", body.get("error"));
 
         verify(kafkaProducer).send(any(OperationMessage.class));
         verify(response).setHeader(eq("X-Correlation-ID"), anyString());
-    }
-
-    private void inject(Object target, String fieldName, Object value) {
-        try {
-            var field = target.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

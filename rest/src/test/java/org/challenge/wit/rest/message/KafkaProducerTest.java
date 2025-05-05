@@ -24,6 +24,6 @@ public class KafkaProducerTest {
         OperationMessage message = new OperationMessage("abc-123", "sum", 10, 20);
         kafkaProducer.send(message);
 
-        verify(kafkaTemplate, times(1)).send("calculator-topic", message.getCorrelationId(), message);
+        verify(kafkaTemplate, times(1)).send("calculator-topic", message);
     }
 }

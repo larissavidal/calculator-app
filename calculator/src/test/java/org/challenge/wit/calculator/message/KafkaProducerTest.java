@@ -1,6 +1,5 @@
 package org.challenge.wit.calculator.message;
 
-import org.challenge.wit.calculator.model.OperationMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
